@@ -1,0 +1,263 @@
+# Implementation Plan
+
+- [ ] 1. Set up EJS and admin panel infrastructure
+  - Install required dependencies (ejs, express-session, connect-mongo, connect-flash, bcryptjs)
+  - Configure EJS as the view engine in Express
+  - Set up session management with MongoDB store
+  - Configure flash messages middleware
+  - Create public directory structure for static assets
+  - Create views directory structure for EJS templates
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
+
+- [ ] 2. Create base layout and reusable components
+  - Create main layout template (views/admin/layouts/main.ejs)
+  - Create authentication layout template (views/admin/layouts/auth.ejs)
+  - Create header partial with navigation (views/admin/partials/header.ejs)
+  - Create footer partial (views/admin/partials/footer.ejs)
+  - Create flash message partial (views/admin/partials/flash.ejs)
+  - Create pagination partial (views/admin/partials/pagination.ejs)
+  - Create image preview modal partial (views/admin/partials/image-preview.ejs)
+  - _Requirements: 12.1, 12.2, 12.3, 12.6, 12.7_
+
+- [ ] 3. Implement authentication system
+  - Create admin authentication middleware (middleware/adminAuth.js)
+  - Create admin auth controller (controllers/admin/adminAuthController.js)
+  - Create login page view (views/admin/auth/login.ejs)
+  - Implement login POST handler with session creation
+  - Implement logout POST handler with session destruction
+  - Create admin routes file (routes/adminRoutes.js)
+  - Integrate admin routes into main Express app
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
+
+- [ ] 4. Create dashboard page
+  - Create dashboard controller (controllers/admin/adminDashboardController.js)
+  - Implement statistics aggregation (total documents, active/inactive counts, total images)
+  - Implement recent documents query (last 6 documents)
+  - Create dashboard view (views/admin/dashboard/index.ejs)
+  - Add statistics cards with icons
+  - Add recent documents grid with thumbnails
+  - Style dashboard with Bootstrap cards and grid
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6_
+
+- [ ] 5. Implement document list page
+  - Create admin document controller (controllers/admin/adminDocumentController.js)
+  - Implement listDocuments method with pagination (20 per page)
+  - Implement status filtering (active, inactive, all)
+  - Implement search functionality (title and description)
+  - Create documents list view (views/admin/documents/index.ejs)
+  - Add search bar and filter dropdowns
+  - Display documents in table/card layout with thumbnails
+  - Add action buttons (View, Edit, Delete) for each document
+  - Implement pagination controls
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 14.1, 14.2, 14.3, 14.4, 14.5_
+
+- [ ] 6. Create document creation form
+  - Implement showCreateForm method in admin document controller
+  - Implement createDocument POST handler
+  - Create document creation view (views/admin/documents/create.ejs)
+  - Add form fields (title, description, status, main image upload)
+  - Implement character counters for title and description
+  - Add client-side form validation
+  - Add image preview for main image upload
+  - Handle form submission with validation
+  - Redirect to document detail page on success
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 13.1, 13.2, 13.3, 13.6, 13.7_
+
+- [ ] 7. Create document edit form
+  - Implement showEditForm method in admin document controller
+  - Implement updateDocument POST handler
+  - Create document edit view (views/admin/documents/edit.ejs)
+  - Pre-fill form with existing document data
+  - Add validation for updated fields
+  - Handle main image replacement
+  - Add "Remove Main Image" button
+  - Display success/error messages after update
+  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8_
+
+- [ ] 8. Create document detail/view page
+  - Implement viewDocument method in admin document controller
+  - Create document detail view (views/admin/documents/view.ejs)
+  - Display document information (title, description, status, dates)
+  - Display main image with upload/replace/remove buttons
+  - Display gallery images in grid layout with order numbers
+  - Add Edit and Delete buttons for document
+  - Style with Bootstrap cards and grid system
+  - _Requirements: 3.6, 6.1, 7.1, 7.6, 7.7, 7.8_
+
+- [ ] 9. Implement main image management
+  - Create admin image controller (controllers/admin/adminImageController.js)
+  - Implement uploadMainImage method (AJAX endpoint)
+  - Implement deleteMainImage method (AJAX endpoint)
+  - Create client-side JavaScript for main image upload (public/js/image-upload.js)
+  - Add image preview before upload
+  - Add file type and size validation
+  - Display upload progress indicator
+  - Handle upload success/error responses
+  - Update UI after successful upload/deletion
+  - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 13.4, 13.5_
+
+- [ ] 10. Implement gallery image upload
+  - Implement uploadSingleImage method in admin image controller
+  - Implement uploadBulkImages method in admin image controller
+  - Add single image upload button to document view
+  - Add multiple image upload button with file input
+  - Create bulk upload progress UI
+  - Display upload results (successful and failed)
+  - Update gallery grid after successful uploads
+  - Handle partial failures in bulk upload
+  - _Requirements: 7.2, 7.3, 7.4, 7.5, 7.6, 12.4_
+
+- [ ] 11. Implement image reordering with drag-and-drop
+  - Create drag-and-drop JavaScript module (public/js/drag-drop.js)
+  - Implement reorderImages method in admin image controller
+  - Add drag-and-drop functionality to gallery images
+  - Add visual feedback during drag operation
+  - Add "Save Order" and "Cancel" buttons
+  - Implement save order AJAX request
+  - Update UI after successful reorder
+  - Handle reorder errors with rollback
+  - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6_
+
+- [ ] 12. Implement bulk image operations
+  - Add checkboxes to gallery images for selection
+  - Add "Select All" and "Deselect All" buttons
+  - Implement deleteBulkImages method in admin image controller
+  - Add "Delete Selected" button with confirmation dialog
+  - Display count of selected images in confirmation
+  - Handle bulk deletion with success/failure reporting
+  - Update UI after bulk deletion
+  - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
+
+- [ ] 13. Implement image lightbox and preview
+  - Create lightbox modal component
+  - Add click handlers to all image thumbnails
+  - Display full-size image in lightbox
+  - Add navigation arrows for gallery images
+  - Add keyboard navigation (arrow keys, escape)
+  - Display image metadata (order number, filename)
+  - Add close button and click-outside-to-close
+  - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7_
+
+- [ ] 14. Implement document deletion
+  - Implement deleteDocument method in admin document controller
+  - Add delete button to document detail page
+  - Create confirmation dialog for document deletion
+  - Handle deletion with cascade (main image + gallery images)
+  - Display success message after deletion
+  - Redirect to documents list after deletion
+  - _Requirements: 3.7, 3.8, 12.3_
+
+- [ ] 15. Add responsive design and mobile support
+  - Create custom CSS file (public/css/admin.css)
+  - Add responsive navigation with hamburger menu for mobile
+  - Implement responsive grid layouts for all pages
+  - Add mobile-friendly form layouts
+  - Make tables horizontally scrollable on mobile
+  - Test on desktop (1920x1080), tablet (768x1024), and mobile (375x667)
+  - Adjust image grid for different screen sizes
+  - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
+
+- [ ] 16. Implement client-side form validation
+  - Create form validation JavaScript module (public/js/form-validation.js)
+  - Add real-time validation for required fields
+  - Add character limit validation with counters
+  - Add file type validation for image uploads
+  - Add file size validation for image uploads
+  - Display inline error messages
+  - Enable/disable submit button based on validation state
+  - Prevent form submission if validation fails
+  - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7_
+
+- [ ] 17. Implement search and filter functionality
+  - Add real-time search with debouncing (300ms delay)
+  - Implement status filter dropdown
+  - Combine search and filter criteria
+  - Add "Clear Filters" button
+  - Display "No results found" message when appropriate
+  - Maintain filter state in URL query parameters
+  - Update pagination based on filtered results
+  - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5_
+
+- [ ] 18. Add error handling and user feedback
+  - Create error page views (views/admin/errors/404.ejs, 500.ejs)
+  - Implement global error handler for admin routes
+  - Add try-catch blocks to all async controller methods
+  - Display user-friendly error messages via flash messages
+  - Add loading indicators for async operations
+  - Implement toast notifications for AJAX operations
+  - Add confirmation dialogs for destructive actions
+  - Handle network errors with retry options
+  - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 15.1, 15.2, 15.3, 15.4, 15.5_
+
+- [ ] 19. Add view helpers and utility functions
+  - Create view helpers middleware for common functions
+  - Add date formatting helper (formatDate)
+  - Add text truncation helper (truncate)
+  - Add file size formatting helper (formatFileSize)
+  - Add active link helper for navigation
+  - Add pluralization helper
+  - Make helpers available to all views via res.locals
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2_
+
+- [ ] 20. Implement session management and security
+  - Configure express-session with secure options
+  - Set up MongoDB session store with connect-mongo
+  - Implement session timeout (30 minutes of inactivity)
+  - Add CSRF protection for forms
+  - Set secure cookie options (httpOnly, secure in production)
+  - Implement session expiration handling
+  - Add "Remember Me" functionality (optional)
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 15.6_
+
+- [ ] 21. Add static assets and styling
+  - Download and add Bootstrap 5 CSS and JS
+  - Download and add Bootstrap Icons
+  - Create custom admin CSS with color scheme
+  - Style navigation sidebar
+  - Style forms and buttons
+  - Style cards and tables
+  - Add hover effects and transitions
+  - Create loading spinners and progress bars
+  - Add placeholder image for missing images
+  - _Requirements: 11.1, 11.2, 11.3, 12.4, 12.5_
+
+- [ ] 22. Optimize performance
+  - Implement pagination for document lists (20 per page)
+  - Add database indexes for frequently queried fields
+  - Implement caching for dashboard statistics (5-minute cache)
+  - Optimize Cloudinary image delivery (thumbnails for lists)
+  - Add debouncing for search input
+  - Lazy load images in gallery
+  - Minify CSS and JavaScript for production
+  - Enable gzip compression
+  - _Requirements: 3.5, 14.1_
+
+- [ ] 23. Create admin panel documentation
+  - Create user guide for admin panel (docs/ADMIN_PANEL_GUIDE.md)
+  - Document all features and how to use them
+  - Add screenshots for key features
+  - Document keyboard shortcuts
+  - Create troubleshooting section
+  - Document environment variables
+  - Add deployment instructions
+  - _Requirements: All requirements (documentation)_
+
+- [ ]* 24. Write integration tests for admin panel
+  - Set up test environment for admin routes
+  - Write tests for authentication flow
+  - Write tests for document CRUD operations
+  - Write tests for main image management
+  - Write tests for gallery image operations
+  - Write tests for search and filter functionality
+  - Write tests for error scenarios
+  - _Requirements: All requirements (testing)_
+
+- [ ]* 25. Perform manual testing and bug fixes
+  - Test all features on different browsers (Chrome, Firefox, Safari, Edge)
+  - Test responsive design on different devices
+  - Test all error scenarios
+  - Test file upload edge cases
+  - Test session management and timeout
+  - Fix any bugs discovered during testing
+  - Verify all requirements are met
+  - _Requirements: All requirements (quality assurance)_
