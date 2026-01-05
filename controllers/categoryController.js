@@ -11,7 +11,7 @@ const createCategory = async (req, res, next) => {
 
     // Validate required fields
     if (!name || name.trim().length === 0) {
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
         error: {
           message: 'Category name is required',
