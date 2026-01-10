@@ -13,7 +13,7 @@ router.post('/', validateDocumentCreation, documentController.createDocument);
 
 /**
  * @route   GET /api/documents
- * @desc    Get all documents with optional status filtering
+ * @desc    Get all documents with optional status, category, and search filtering
  * @access  Public
  */
 router.get('/', documentController.getAllDocuments);

@@ -7,8 +7,7 @@ const mongoose = require('mongoose');
 const validateCategoryCreation = (req, res, next) => {
   const { name, description, icon, status } = req.body;
   const errors = [];
-   console.log(req.body);
-    
+  
   // Validate name (required)
   if (!name) {
     errors.push('Category name is required');
@@ -139,84 +138,68 @@ const validateCategoryUpdate = (req, res, next) => {
  * Requirements: 11.1, 11.2, 11.3, 11.4, 11.5
  */
 const validateCategoryReorder = (req, res, next) => {
-  const { categoryOrders } = req.body;
+  const { order } = req.body;
   const errors = [];
   
-  // Validate categoryOrders exists
-  if (!categoryOrders) {
+  // Validate order exists
+  if (!order) {
     return res.status(400).json({
       success: false,
       error: {
-        message: 'categoryOrders array is required',
-        code: 'MISSING_CATEGORY_ORDERS'
+        message: 'Order array is required',
+        code: 'MISSING_ORDER_ARRAY'
       }
     });
   }
   
-  // Validate categoryOrders is an array
-  if (!Array.isArray(categoryOrders)) {
+  // Validate order is an array
+  if (!Array.isArray(order)) {
     return res.status(400).json({
       success: false,
       error: {
-        message: 'categoryOrders must be an array',
-        code: 'INVALID_CATEGORY_ORDERS_TYPE'
+        message: 'Order must be an array',
+        code: 'INVALID_ORDER_TYPE'
       }
     });
   }
   
   // Validate array is not empty
-  if (categoryOrders.length === 0) {
+  if (order.length === 0) {
     return res.status(400).json({
       success: false,
       error: {
-        message: 'categoryOrders array cannot be empty',
-        code: 'EMPTY_CATEGORY_ORDERS'
+        message: 'Order array cannot be empty',
+        code: 'EMPTY_ORDER_ARRAY'
       }
     });
   }
   
-  // Track order values and category IDs to check for duplicates
-  const orderValues = new Set();
+  // Track category IDs to check for duplicates
   const categoryIds = new Set();
   
-  // Validate each item in categoryOrders array
-  categoryOrders.forEach((item, index) => {
-    // Validate item structure
-    if (typeof item !== 'object' || item === null) {
-      errors.push(`Item at index ${index} must be an object`);
+  // Validate each item in order array
+  order.forEach((item, index) => {
+    let categoryId;
+    
+    // Handle both string IDs and objects with categoryId
+    if (typeof item === 'string') {
+      categoryId = item;
+    } else if (typeof item === 'object' && item !== null && item.categoryId) {
+      categoryId = item.categoryId;
+    } else {
+      errors.push(`Item at index ${index} must be a valid category ID string or object with categoryId`);
       return;
     }
     
-    // Validate categoryId
-    if (!item.categoryId) {
-      errors.push(`Item at index ${index} is missing categoryId`);
-    } else if (typeof item.categoryId !== 'string') {
-      errors.push(`Item at index ${index}: categoryId must be a string`);
-    } else if (!mongoose.Types.ObjectId.isValid(item.categoryId)) {
-      errors.push(`Item at index ${index}: categoryId must be a valid MongoDB ObjectId`);
+    // Validate categoryId format
+    if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+      errors.push(`Item at index ${index}: "${categoryId}" is not a valid MongoDB ObjectId`);
     } else {
       // Check for duplicate categoryIds
-      if (categoryIds.has(item.categoryId)) {
-        errors.push(`Item at index ${index}: duplicate categoryId "${item.categoryId}"`);
+      if (categoryIds.has(categoryId)) {
+        errors.push(`Item at index ${index}: duplicate categoryId "${categoryId}"`);
       }
-      categoryIds.add(item.categoryId);
-    }
-    
-    // Validate displayOrder
-    if (item.displayOrder === undefined || item.displayOrder === null) {
-      errors.push(`Item at index ${index} is missing displayOrder`);
-    } else if (typeof item.displayOrder !== 'number') {
-      errors.push(`Item at index ${index}: displayOrder must be a number`);
-    } else if (!Number.isInteger(item.displayOrder)) {
-      errors.push(`Item at index ${index}: displayOrder must be an integer`);
-    } else if (item.displayOrder < 0) {
-      errors.push(`Item at index ${index}: displayOrder must be greater than or equal to 0`);
-    } else {
-      // Check for duplicate displayOrder values
-      if (orderValues.has(item.displayOrder)) {
-        errors.push(`Item at index ${index}: duplicate displayOrder value ${item.displayOrder}`);
-      }
-      orderValues.add(item.displayOrder);
+      categoryIds.add(categoryId);
     }
   });
   

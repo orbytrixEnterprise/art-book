@@ -1,38 +1,45 @@
 const Document = require('../models/Document');
 const Category = require('../models/Category');
 const cloudinaryService = require('./CloudinaryService');
+const {
+  CategoryError,
+  createNotFoundError,
+  createInactiveCategoryError,
+  createInvalidIdError,
+  validateCategoryId,
+  handleMongooseError,
+  logCategoryError
+} = require('../utils/categoryErrors');
 
 class DocumentService {
   /**
    * Validate that a category exists and is active
    * @param {String} categoryId - Category ID
    * @returns {Promise<Object>} - Category object
-   * @throws {Error} - If category doesn't exist or is inactive
+   * @throws {CategoryError} - If category doesn't exist or is inactive
    */
   async validateCategory(categoryId) {
+    const operation = 'validateCategory';
+    const context = { categoryId };
+    
     try {
+      validateCategoryId(categoryId);
+      
       const category = await Category.findById(categoryId);
       
       if (!category) {
-        const error = new Error('Category not found');
-        error.statusCode = 404;
-        throw error;
+        throw createNotFoundError(categoryId);
       }
       
       if (category.status !== 'active') {
-        const error = new Error('Cannot assign document to inactive category');
-        error.statusCode = 400;
-        throw error;
+        throw createInactiveCategoryError(category.name);
       }
       
       return category;
     } catch (error) {
-      if (error.name === 'CastError') {
-        const castError = new Error('Invalid category ID format');
-        castError.statusCode = 400;
-        throw castError;
-      }
-      throw error;
+      const categoryError = handleMongooseError(error, operation);
+      logCategoryError(categoryError, operation, context);
+      throw categoryError;
     }
   }
   /**
@@ -104,7 +111,7 @@ class DocumentService {
 
   /**
    * Get all documents with optional filtering
-   * @param {Object} filters - Optional filters (status, category)
+   * @param {Object} filters - Optional filters (status, category, search)
    * @returns {Promise<Array>} - Array of documents with populated category
    */
   async getAllDocuments(filters = {}) {
@@ -119,13 +126,40 @@ class DocumentService {
         query.status = filters.status;
       }
 
-      // Apply category filter if provided
+      // Apply category filter if provided (supports both ID and slug)
       if (filters.category) {
-        // Validate category ID format
-        if (!filters.category.match(/^[0-9a-fA-F]{24}$/)) {
-          throw new Error('Invalid category ID format');
+        // Check if it's a valid ObjectId (24 character hex string)
+        if (filters.category.match(/^[0-9a-fA-F]{24}$/)) {
+          // Validate category exists before filtering
+          try {
+            validateCategoryId(filters.category);
+            const categoryExists = await Category.findById(filters.category);
+            if (!categoryExists) {
+              throw createNotFoundError(filters.category);
+            }
+            query.category = filters.category;
+          } catch (error) {
+            if (error instanceof CategoryError) {
+              throw error;
+            }
+            throw createNotFoundError(filters.category);
+          }
+        } else {
+          // Filter by category slug - first find the category
+          const category = await Category.findOne({ slug: filters.category });
+          if (!category) {
+            throw createNotFoundError(filters.category);
+          }
+          query.category = category._id;
         }
-        query.category = filters.category;
+      }
+
+      // Apply search filter if provided
+      if (filters.search) {
+        query.$or = [
+          { title: { $regex: filters.search, $options: 'i' } },
+          { description: { $regex: filters.search, $options: 'i' } }
+        ];
       }
 
       const documents = await Document.find(query)
@@ -134,6 +168,9 @@ class DocumentService {
       
       return documents;
     } catch (error) {
+      if (error instanceof CategoryError) {
+        throw error;
+      }
       throw new Error(`Failed to retrieve documents: ${error.message}`);
     }
   }

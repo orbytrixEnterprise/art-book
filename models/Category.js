@@ -10,7 +10,6 @@ const categorySchema = new mongoose.Schema({
   },
   slug: {
     type: String,
-    required: false,
     unique: true,
     lowercase: true,
     trim: true
@@ -76,7 +75,7 @@ categorySchema.methods.generateSlug = function() {
 
 // Pre-save hook to generate slug
 categorySchema.pre('save', async function(next) {
-  if (this.isModified('name')) {
+  if (this.isModified('name') || !this.slug) {
     let slug = this.generateSlug();
     let slugExists = true;
     let counter = 1;

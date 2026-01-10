@@ -3,6 +3,10 @@ const router = express.Router();
 const documentRoutes = require('./documentRoutes');
 const imageRoutes = require('./imageRoutes');
 const categoryRoutes = require('./categoryRoutes');
+const dashboardRoutes = require('./dashboardRoutes');
+
+// Mount dashboard routes
+router.use('/dashboard', dashboardRoutes);
 
 // Mount category routes
 router.use('/categories', categoryRoutes);

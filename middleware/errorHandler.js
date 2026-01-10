@@ -3,6 +3,8 @@
  * Handles all errors and formats them into consistent response structure
  */
 
+const { CategoryError, formatErrorResponse } = require('../utils/categoryErrors');
+
 /**
  * Custom error class for application errors
  */
@@ -85,6 +87,16 @@ const handleCloudinaryError = (err) => {
  * Detect error type and format accordingly
  */
 const detectErrorType = (err) => {
+  // Handle CategoryError instances first
+  if (err instanceof CategoryError) {
+    return {
+      statusCode: err.statusCode,
+      message: err.message,
+      code: err.code,
+      details: err.details
+    };
+  }
+  
   // Mongoose validation error
   if (err.name === 'ValidationError') {
     return handleMongooseValidationError(err);
@@ -124,16 +136,33 @@ const detectErrorType = (err) => {
  * Must be used as the last middleware in the Express app
  */
 const errorHandler = (err, req, res, next) => {
-  // Log error for debugging
-  console.error('Error occurred:', {
-    message: err.message,
-    stack: err.stack,
-    path: req.path,
-    method: req.method,
-    timestamp: new Date().toISOString()
-  });
+  // Log error for debugging (enhanced logging for CategoryError)
+  if (err instanceof CategoryError) {
+    console.error('Category Error occurred:', {
+      message: err.message,
+      code: err.code,
+      statusCode: err.statusCode,
+      details: err.details,
+      path: req.path,
+      method: req.method,
+      timestamp: new Date().toISOString()
+    });
+  } else {
+    console.error('Error occurred:', {
+      message: err.message,
+      stack: err.stack,
+      path: req.path,
+      method: req.method,
+      timestamp: new Date().toISOString()
+    });
+  }
   
-  // Detect and format error
+  // Handle CategoryError instances with structured response
+  if (err instanceof CategoryError) {
+    return res.status(err.statusCode).json(formatErrorResponse(err));
+  }
+  
+  // Detect and format other error types
   const errorInfo = detectErrorType(err);
   
   if (errorInfo) {
@@ -194,5 +223,6 @@ const notFoundHandler = (req, res, next) => {
 module.exports = {
   errorHandler,
   notFoundHandler,
-  AppError
+  AppError,
+  CategoryError
 };

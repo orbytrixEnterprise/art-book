@@ -1,4 +1,5 @@
 const categoryService = require('../services/CategoryService');
+const { CategoryError, formatErrorResponse } = require('../utils/categoryErrors');
 
 /**
  * Create a new category
@@ -8,50 +9,6 @@ const categoryService = require('../services/CategoryService');
 const createCategory = async (req, res, next) => {
   try {
     const { name, description, icon, status } = req.body;
-
-    // Validate required fields
-    if (!name || name.trim().length === 0) {
-      return res.status(400).json({ 
-        success: false,
-        error: {
-          message: 'Category name is required',
-          code: 'VALIDATION_ERROR'
-        }
-      });
-    }
-
-    // Validate name length
-    if (name.length > 100) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: 'Category name cannot exceed 100 characters',
-          code: 'VALIDATION_ERROR'
-        }
-      });
-    }
-
-    // Validate description length if provided
-    if (description && description.length > 500) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: 'Description cannot exceed 500 characters',
-          code: 'VALIDATION_ERROR'
-        }
-      });
-    }
-
-    // Validate status if provided
-    if (status && !['active', 'inactive'].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: 'Status must be either "active" or "inactive"',
-          code: 'VALIDATION_ERROR'
-        }
-      });
-    }
 
     const category = await categoryService.createCategory({ 
       name, 
@@ -65,15 +22,9 @@ const createCategory = async (req, res, next) => {
       data: category
     });
   } catch (error) {
-    // Handle duplicate category name
-    if (error.message.includes('already exists')) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'DUPLICATE_CATEGORY_NAME'
-        }
-      });
+    // Handle CategoryError instances with structured error responses
+    if (error instanceof CategoryError) {
+      return res.status(error.statusCode).json(formatErrorResponse(error));
     }
 
     next(error);
@@ -100,11 +51,35 @@ const getAllCategories = async (req, res, next) => {
 
     const categories = await categoryService.getAllCategories(filters);
 
+    // Handle empty results with appropriate message (requirement 9.5)
+    if (categories.length === 0 && (filters.search || filters.status)) {
+      let message = 'No categories found';
+      
+      if (filters.search && filters.status) {
+        message = `No categories found matching search "${filters.search}" with status "${filters.status}"`;
+      } else if (filters.search) {
+        message = `No categories found matching search "${filters.search}"`;
+      } else if (filters.status) {
+        message = `No categories found with status "${filters.status}"`;
+      }
+      
+      return res.status(200).json({
+        success: true,
+        data: categories,
+        message: message
+      });
+    }
+
     res.status(200).json({
       success: true,
       data: categories
     });
   } catch (error) {
+    // Handle CategoryError instances with structured error responses
+    if (error instanceof CategoryError) {
+      return res.status(error.statusCode).json(formatErrorResponse(error));
+    }
+
     next(error);
   }
 };
@@ -125,26 +100,9 @@ const getCategoryById = async (req, res, next) => {
       data: category
     });
   } catch (error) {
-    // Handle 404 errors
-    if (error.message === 'Category not found') {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'NOT_FOUND'
-        }
-      });
-    }
-
-    // Handle invalid ID format
-    if (error.message === 'Invalid category ID') {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'VALIDATION_ERROR'
-        }
-      });
+    // Handle CategoryError instances with structured error responses
+    if (error instanceof CategoryError) {
+      return res.status(error.statusCode).json(formatErrorResponse(error));
     }
 
     next(error);
@@ -167,15 +125,9 @@ const getCategoryBySlug = async (req, res, next) => {
       data: category
     });
   } catch (error) {
-    // Handle 404 errors
-    if (error.message === 'Category not found') {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'NOT_FOUND'
-        }
-      });
+    // Handle CategoryError instances with structured error responses
+    if (error instanceof CategoryError) {
+      return res.status(error.statusCode).json(formatErrorResponse(error));
     }
 
     next(error);
@@ -203,39 +155,6 @@ const updateCategory = async (req, res, next) => {
       });
     }
 
-    // Validate name length if provided
-    if (name && name.length > 100) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: 'Category name cannot exceed 100 characters',
-          code: 'VALIDATION_ERROR'
-        }
-      });
-    }
-
-    // Validate description length if provided
-    if (description && description.length > 500) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: 'Description cannot exceed 500 characters',
-          code: 'VALIDATION_ERROR'
-        }
-      });
-    }
-
-    // Validate status if provided
-    if (status && !['active', 'inactive'].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: 'Status must be either "active" or "inactive"',
-          code: 'VALIDATION_ERROR'
-        }
-      });
-    }
-
     const category = await categoryService.updateCategory(id, { 
       name, 
       description, 
@@ -248,37 +167,9 @@ const updateCategory = async (req, res, next) => {
       data: category
     });
   } catch (error) {
-    // Handle duplicate category name
-    if (error.message.includes('already exists')) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'DUPLICATE_CATEGORY_NAME'
-        }
-      });
-    }
-
-    // Handle 404 errors
-    if (error.message === 'Category not found') {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'NOT_FOUND'
-        }
-      });
-    }
-
-    // Handle invalid ID format
-    if (error.message === 'Invalid category ID') {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'VALIDATION_ERROR'
-        }
-      });
+    // Handle CategoryError instances with structured error responses
+    if (error instanceof CategoryError) {
+      return res.status(error.statusCode).json(formatErrorResponse(error));
     }
 
     next(error);
@@ -303,54 +194,9 @@ const deleteCategory = async (req, res, next) => {
       }
     });
   } catch (error) {
-    // Handle category in use error
-    if (error.message.includes('assigned documents')) {
-      const match = error.message.match(/(\d+) assigned documents/);
-      const documentCount = match ? parseInt(match[1]) : 0;
-      
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'CATEGORY_IN_USE',
-          details: {
-            documentCount
-          }
-        }
-      });
-    }
-
-    // Handle default category deletion attempt
-    if (error.message.includes('default category')) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'CANNOT_DELETE_DEFAULT'
-        }
-      });
-    }
-
-    // Handle 404 errors
-    if (error.message === 'Category not found') {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'NOT_FOUND'
-        }
-      });
-    }
-
-    // Handle invalid ID format
-    if (error.message === 'Invalid category ID') {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'VALIDATION_ERROR'
-        }
-      });
+    // Handle CategoryError instances with structured error responses
+    if (error instanceof CategoryError) {
+      return res.status(error.statusCode).json(formatErrorResponse(error));
     }
 
     next(error);
@@ -383,26 +229,9 @@ const getDocumentsByCategory = async (req, res, next) => {
       data: result
     });
   } catch (error) {
-    // Handle 404 errors
-    if (error.message === 'Category not found') {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'NOT_FOUND'
-        }
-      });
-    }
-
-    // Handle invalid ID format
-    if (error.message === 'Invalid category ID') {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'VALIDATION_ERROR'
-        }
-      });
+    // Handle CategoryError instances with structured error responses
+    if (error instanceof CategoryError) {
+      return res.status(error.statusCode).json(formatErrorResponse(error));
     }
 
     next(error);
@@ -418,17 +247,6 @@ const reorderCategories = async (req, res, next) => {
   try {
     const { order } = req.body;
 
-    // Validate order array
-    if (!Array.isArray(order) || order.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: 'Order array is required and must not be empty',
-          code: 'VALIDATION_ERROR'
-        }
-      });
-    }
-
     const categories = await categoryService.reorderCategories(order);
 
     res.status(200).json({
@@ -436,17 +254,9 @@ const reorderCategories = async (req, res, next) => {
       data: categories
     });
   } catch (error) {
-    // Handle validation errors
-    if (error.message.includes('Invalid category IDs') || 
-        error.message.includes('do not exist') ||
-        error.message.includes('Order array')) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'VALIDATION_ERROR'
-        }
-      });
+    // Handle CategoryError instances with structured error responses
+    if (error instanceof CategoryError) {
+      return res.status(error.statusCode).json(formatErrorResponse(error));
     }
 
     next(error);
@@ -467,6 +277,11 @@ const getCategoryStatistics = async (req, res, next) => {
       data: statistics
     });
   } catch (error) {
+    // Handle CategoryError instances with structured error responses
+    if (error instanceof CategoryError) {
+      return res.status(error.statusCode).json(formatErrorResponse(error));
+    }
+
     next(error);
   }
 };

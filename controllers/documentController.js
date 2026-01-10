@@ -1,4 +1,5 @@
 const documentService = require('../services/DocumentService');
+const { CategoryError, formatErrorResponse } = require('../utils/categoryErrors');
 
 /**
  * Create a new document
@@ -48,35 +49,9 @@ const createDocument = async (req, res, next) => {
       data: document
     });
   } catch (error) {
-    // Handle category-specific errors
-    if (error.message === 'Category not found') {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'CATEGORY_NOT_FOUND'
-        }
-      });
-    }
-
-    if (error.message === 'Cannot assign document to inactive category') {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'INVALID_CATEGORY'
-        }
-      });
-    }
-
-    if (error.message === 'Invalid category ID format') {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'VALIDATION_ERROR'
-        }
-      });
+    // Handle CategoryError instances with structured error responses
+    if (error instanceof CategoryError) {
+      return res.status(error.statusCode).json(formatErrorResponse(error));
     }
 
     next(error);
@@ -125,12 +100,12 @@ const getDocumentById = async (req, res, next) => {
 };
 
 /**
- * Get all documents with optional status filtering
+ * Get all documents with optional status, category, and search filtering
  * @route GET /api/documents
  */
 const getAllDocuments = async (req, res, next) => {
   try {
-    const { status, category } = req.query;
+    const { status, category, search } = req.query;
 
     // Build filters object
     const filters = {};
@@ -140,6 +115,9 @@ const getAllDocuments = async (req, res, next) => {
     if (category) {
       filters.category = category;
     }
+    if (search) {
+      filters.search = search;
+    }
 
     const documents = await documentService.getAllDocuments(filters);
 
@@ -148,15 +126,9 @@ const getAllDocuments = async (req, res, next) => {
       data: documents
     });
   } catch (error) {
-    // Handle invalid category ID format
-    if (error.message && error.message.includes('Invalid category ID format')) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: 'Invalid category ID format',
-          code: 'VALIDATION_ERROR'
-        }
-      });
+    // Handle CategoryError instances with structured error responses
+    if (error instanceof CategoryError) {
+      return res.status(error.statusCode).json(formatErrorResponse(error));
     }
 
     next(error);
@@ -201,35 +173,9 @@ const updateDocument = async (req, res, next) => {
       data: document
     });
   } catch (error) {
-    // Handle category-specific errors
-    if (error.message === 'Category not found') {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'CATEGORY_NOT_FOUND'
-        }
-      });
-    }
-
-    if (error.message === 'Cannot assign document to inactive category') {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'INVALID_CATEGORY'
-        }
-      });
-    }
-
-    if (error.message === 'Invalid category ID format') {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: error.message,
-          code: 'VALIDATION_ERROR'
-        }
-      });
+    // Handle CategoryError instances with structured error responses
+    if (error instanceof CategoryError) {
+      return res.status(error.statusCode).json(formatErrorResponse(error));
     }
 
     // Handle 404 errors

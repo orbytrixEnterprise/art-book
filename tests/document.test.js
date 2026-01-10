@@ -121,7 +121,8 @@ describe('Document API Integration Tests', () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.error.message).toContain('Category is required');
+      expect(response.body.error.message).toBe('Validation failed');
+      expect(response.body.error.details).toContain('Category is required');
     });
 
     it('should fail when category does not exist', async () => {
@@ -338,6 +339,225 @@ describe('Document API Integration Tests', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data).toHaveLength(2);
       expect(response.body.data.every(doc => doc.category._id === testCategory._id.toString())).toBe(true);
+    });
+
+    it('should filter documents by category slug', async () => {
+      // Create another category
+      const category2 = await Category.create({
+        name: 'Nature Drawings',
+        description: 'Nature-themed drawings',
+        status: 'active'
+      });
+
+      // Create documents in different categories
+      await Document.create([
+        { title: 'Doc 1', description: 'Description 1', category: testCategory._id },
+        { title: 'Doc 2', description: 'Description 2', category: testCategory._id },
+        { title: 'Doc 3', description: 'Description 3', category: category2._id }
+      ]);
+
+      const response = await request(app)
+        .get(`/api/documents?category=${testCategory.slug}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveLength(2);
+      expect(response.body.data.every(doc => doc.category._id === testCategory._id.toString())).toBe(true);
+    });
+
+    it('should return 404 when filtering by non-existent category slug', async () => {
+      await Document.create([
+        { title: 'Doc 1', description: 'Description 1', category: testCategory._id }
+      ]);
+
+      const response = await request(app)
+        .get('/api/documents?category=non-existent-slug')
+        .expect(404);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.message).toBe('Category not found');
+      expect(response.body.error.code).toBe('CATEGORY_NOT_FOUND');
+    });
+
+    it('should combine status and category filters', async () => {
+      // Create another category
+      const category2 = await Category.create({
+        name: 'Category 2',
+        description: 'Second category',
+        status: 'active'
+      });
+
+      // Create documents with different statuses and categories
+      await Document.create([
+        { title: 'Active Cat1', description: 'Description 1', category: testCategory._id, status: 'active' },
+        { title: 'Inactive Cat1', description: 'Description 2', category: testCategory._id, status: 'deactive' },
+        { title: 'Active Cat2', description: 'Description 3', category: category2._id, status: 'active' },
+        { title: 'Inactive Cat2', description: 'Description 4', category: category2._id, status: 'deactive' }
+      ]);
+
+      const response = await request(app)
+        .get(`/api/documents?category=${testCategory.slug}&status=active`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].title).toBe('Active Cat1');
+      expect(response.body.data[0].status).toBe('active');
+      expect(response.body.data[0].category._id).toBe(testCategory._id.toString());
+    });
+
+    it('should filter documents by search term in title', async () => {
+      // Create documents with different titles
+      await Document.create([
+        { title: 'Portrait Drawing', description: 'A beautiful portrait', category: testCategory._id },
+        { title: 'Landscape Painting', description: 'A scenic landscape', category: testCategory._id },
+        { title: 'Abstract Art', description: 'Modern abstract piece', category: testCategory._id }
+      ]);
+
+      const response = await request(app)
+        .get('/api/documents?search=portrait')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].title).toBe('Portrait Drawing');
+    });
+
+    it('should filter documents by search term in description', async () => {
+      // Create documents with different descriptions
+      await Document.create([
+        { title: 'Drawing 1', description: 'A beautiful portrait of a person', category: testCategory._id },
+        { title: 'Drawing 2', description: 'A scenic landscape view', category: testCategory._id },
+        { title: 'Drawing 3', description: 'Modern abstract artwork', category: testCategory._id }
+      ]);
+
+      const response = await request(app)
+        .get('/api/documents?search=landscape')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].title).toBe('Drawing 2');
+    });
+
+    it('should perform case-insensitive search', async () => {
+      // Create documents with mixed case
+      await Document.create([
+        { title: 'Portrait Drawing', description: 'A beautiful portrait', category: testCategory._id },
+        { title: 'Landscape Painting', description: 'A scenic landscape', category: testCategory._id }
+      ]);
+
+      const response = await request(app)
+        .get('/api/documents?search=PORTRAIT')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].title).toBe('Portrait Drawing');
+    });
+
+    it('should search across both title and description', async () => {
+      // Create documents where search term appears in different fields
+      await Document.create([
+        { title: 'Nature Drawing', description: 'A beautiful portrait of trees', category: testCategory._id },
+        { title: 'Portrait Study', description: 'A detailed face drawing', category: testCategory._id },
+        { title: 'Abstract Art', description: 'Modern geometric shapes', category: testCategory._id }
+      ]);
+
+      const response = await request(app)
+        .get('/api/documents?search=portrait')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveLength(2);
+      const titles = response.body.data.map(doc => doc.title);
+      expect(titles).toContain('Nature Drawing'); // Found in description
+      expect(titles).toContain('Portrait Study'); // Found in title
+    });
+
+    it('should combine search with status filter', async () => {
+      // Create documents with different statuses
+      await Document.create([
+        { title: 'Portrait Drawing', description: 'A beautiful portrait', category: testCategory._id, status: 'active' },
+        { title: 'Portrait Sketch', description: 'A quick portrait', category: testCategory._id, status: 'deactive' },
+        { title: 'Landscape Art', description: 'A scenic view', category: testCategory._id, status: 'active' }
+      ]);
+
+      const response = await request(app)
+        .get('/api/documents?search=portrait&status=active')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].title).toBe('Portrait Drawing');
+      expect(response.body.data[0].status).toBe('active');
+    });
+
+    it('should combine search with category filter', async () => {
+      // Create another category
+      const category2 = await Category.create({
+        name: 'Nature',
+        description: 'Nature drawings',
+        status: 'active'
+      });
+
+      // Create documents in different categories
+      await Document.create([
+        { title: 'Portrait Drawing', description: 'A beautiful portrait', category: testCategory._id },
+        { title: 'Portrait Painting', description: 'Oil portrait', category: category2._id },
+        { title: 'Landscape Art', description: 'A scenic view', category: testCategory._id }
+      ]);
+
+      const response = await request(app)
+        .get(`/api/documents?search=portrait&category=${testCategory.slug}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].title).toBe('Portrait Drawing');
+      expect(response.body.data[0].category._id).toBe(testCategory._id.toString());
+    });
+
+    it('should combine all filters (search, status, category)', async () => {
+      // Create another category
+      const category2 = await Category.create({
+        name: 'Nature',
+        description: 'Nature drawings',
+        status: 'active'
+      });
+
+      // Create documents with various combinations
+      await Document.create([
+        { title: 'Portrait Drawing', description: 'A beautiful portrait', category: testCategory._id, status: 'active' },
+        { title: 'Portrait Sketch', description: 'A quick portrait', category: testCategory._id, status: 'deactive' },
+        { title: 'Portrait Painting', description: 'Oil portrait', category: category2._id, status: 'active' },
+        { title: 'Landscape Art', description: 'A scenic view', category: testCategory._id, status: 'active' }
+      ]);
+
+      const response = await request(app)
+        .get(`/api/documents?search=portrait&status=active&category=${testCategory.slug}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].title).toBe('Portrait Drawing');
+      expect(response.body.data[0].status).toBe('active');
+      expect(response.body.data[0].category._id).toBe(testCategory._id.toString());
+    });
+
+    it('should return empty array when search finds no matches', async () => {
+      // Create documents that won't match the search
+      await Document.create([
+        { title: 'Landscape Drawing', description: 'A beautiful landscape', category: testCategory._id },
+        { title: 'Abstract Art', description: 'Modern abstract piece', category: testCategory._id }
+      ]);
+
+      const response = await request(app)
+        .get('/api/documents?search=nonexistent')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toEqual([]);
     });
   });
 

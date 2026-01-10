@@ -40,6 +40,10 @@ const options = {
       {
         name: 'Categories',
         description: 'Category management endpoints for organizing documents'
+      },
+      {
+        name: 'Dashboard',
+        description: 'Dashboard statistics and overview endpoints'
       }
     ]
   },

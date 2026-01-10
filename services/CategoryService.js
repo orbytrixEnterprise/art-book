@@ -1,266 +1,392 @@
 const Category = require('../models/Category');
 const Document = require('../models/Document');
 const mongoose = require('mongoose');
+const {
+  CategoryError,
+  createDuplicateNameError,
+  createNotFoundError,
+  createCategoryInUseError,
+  createCannotDeleteDefaultError,
+  createInvalidIdError,
+  createInactiveCategoryError,
+  createValidationError,
+  validateCategoryId,
+  handleMongooseError,
+  logCategoryError
+} = require('../utils/categoryErrors');
 
 class CategoryService {
   /**
    * Create a new category
-   * Requirements: 2.1, 2.2, 2.3
+   * Requirements: 2.1, 2.2, 2.3, 15.1
    */
   async createCategory(data) {
+    const operation = 'createCategory';
+    const context = { categoryData: { name: data.name, status: data.status } };
+    
     try {
-      // Check if name already exists
+      // Validate category name
+      if (!data.name || data.name.trim().length === 0) {
+        throw createValidationError('Category name is required');
+      }
+      
+      if (data.name.length > 100) {
+        throw createValidationError('Category name cannot exceed 100 characters');
+      }
+      
+      // Validate description length if provided
+      if (data.description && data.description.length > 500) {
+        throw createValidationError('Description cannot exceed 500 characters');
+      }
+      
+      // Check if name already exists (case-insensitive)
       const existingCategory = await Category.findOne({ 
-        name: { $regex: new RegExp(`^${data.name}$`, 'i') } 
+        name: { $regex: new RegExp(`^${data.name.trim()}$`, 'i') }
       });
       
       if (existingCategory) {
-        throw new Error('Category name already exists');
+        throw createDuplicateNameError(data.name.trim());
       }
-
-      // Get next display order if not provided
-      if (data.displayOrder === undefined) {
-        data.displayOrder = await Category.getNextDisplayOrder();
-      }
-
-      const category = new Category(data);
+      
+      // Get next display order
+      const lastCategory = await Category.findOne().sort({ displayOrder: -1 });
+      const displayOrder = lastCategory ? lastCategory.displayOrder + 1 : 1;
+      
+      // Create category
+      const category = new Category({
+        name: data.name.trim(),
+        description: data.description || '',
+        icon: data.icon || '📁',
+        status: data.status || 'active',
+        displayOrder
+      });
+      
       await category.save();
+      
+      // Populate document count
+      await category.populate('documentCount');
+      
+      logCategoryError(new Error('Category created successfully'), operation, { 
+        ...context, 
+        categoryId: category._id,
+        success: true 
+      });
       
       return category;
     } catch (error) {
-      if (error.code === 11000) {
-        throw new Error('Category name already exists');
-      }
-      throw error;
+      const categoryError = handleMongooseError(error, operation);
+      logCategoryError(categoryError, operation, context);
+      throw categoryError;
     }
   }
 
   /**
    * Get all categories with optional filters
-   * Requirements: 4.1, 4.2, 4.5
+   * Requirements: 4.1, 4.2, 4.5, 9.1, 9.2, 9.3, 9.4, 9.5
    */
   async getAllCategories(filters = {}) {
-    const query = {};
-
-    // Apply status filter
-    if (filters.status) {
-      query.status = filters.status;
+    const operation = 'getAllCategories';
+    const context = { filters };
+    
+    try {
+      const query = {};
+      
+      // Apply status filter
+      if (filters.status) {
+        if (!['active', 'inactive'].includes(filters.status)) {
+          throw createValidationError('Status must be either "active" or "inactive"');
+        }
+        query.status = filters.status;
+      }
+      
+      // Apply search filter
+      if (filters.search) {
+        query.$or = [
+          { name: { $regex: filters.search, $options: 'i' } },
+          { description: { $regex: filters.search, $options: 'i' } }
+        ];
+      }
+      
+      const categories = await Category.find(query)
+        .populate('documentCount')
+        .sort({ displayOrder: 1, name: 1 });
+      
+      return categories;
+    } catch (error) {
+      const categoryError = handleMongooseError(error, operation);
+      logCategoryError(categoryError, operation, context);
+      throw categoryError;
     }
-
-    // Apply search filter
-    if (filters.search) {
-      query.$or = [
-        { name: { $regex: filters.search, $options: 'i' } },
-        { description: { $regex: filters.search, $options: 'i' } }
-      ];
-    }
-
-    const categories = await Category.find(query)
-      .sort({ displayOrder: 1, name: 1 })
-      .populate('documentCount');
-
-    return categories;
   }
 
   /**
    * Get category by ID
-   * Requirements: 4.3
+   * Requirements: 5.3, 15.3
    */
   async getCategoryById(id) {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new Error('Invalid category ID');
-    }
-
-    const category = await Category.findById(id).populate('documentCount');
+    const operation = 'getCategoryById';
+    const context = { categoryId: id };
     
-    if (!category) {
-      throw new Error('Category not found');
+    try {
+      validateCategoryId(id);
+      
+      const category = await Category.findById(id).populate('documentCount');
+      
+      if (!category) {
+        throw createNotFoundError(id);
+      }
+      
+      return category;
+    } catch (error) {
+      const categoryError = handleMongooseError(error, operation);
+      logCategoryError(categoryError, operation, context);
+      throw categoryError;
     }
-
-    return category;
   }
 
   /**
    * Get category by slug
-   * Requirements: 4.3
+   * Requirements: 5.4, 15.3
    */
   async getCategoryBySlug(slug) {
-    const category = await Category.findOne({ slug }).populate('documentCount');
+    const operation = 'getCategoryBySlug';
+    const context = { slug };
     
-    if (!category) {
-      throw new Error('Category not found');
+    try {
+      if (!slug || slug.trim().length === 0) {
+        throw createValidationError('Category slug is required');
+      }
+      
+      const category = await Category.findOne({ slug: slug.trim() }).populate('documentCount');
+      
+      if (!category) {
+        throw createNotFoundError(slug);
+      }
+      
+      return category;
+    } catch (error) {
+      const categoryError = handleMongooseError(error, operation);
+      logCategoryError(categoryError, operation, context);
+      throw categoryError;
     }
-
-    return category;
   }
 
   /**
    * Update category
-   * Requirements: 2.4, 2.5
+   * Requirements: 5.5, 6.2, 6.3, 6.5, 15.1, 15.3
    */
   async updateCategory(id, data) {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new Error('Invalid category ID');
-    }
-
-    const category = await Category.findById(id);
+    const operation = 'updateCategory';
+    const context = { categoryId: id, updateData: data };
     
-    if (!category) {
-      throw new Error('Category not found');
-    }
-
-    // Check name uniqueness if name is being changed
-    if (data.name && data.name !== category.name) {
-      const existingCategory = await Category.findOne({ 
-        name: { $regex: new RegExp(`^${data.name}$`, 'i') },
-        _id: { $ne: id }
-      });
+    try {
+      validateCategoryId(id);
       
-      if (existingCategory) {
-        throw new Error('Category name already exists');
+      // Validate update data
+      if (data.name !== undefined) {
+        if (!data.name || data.name.trim().length === 0) {
+          throw createValidationError('Category name cannot be empty');
+        }
+        
+        if (data.name.length > 100) {
+          throw createValidationError('Category name cannot exceed 100 characters');
+        }
+        
+        // Check for duplicate name (excluding current category)
+        const existingCategory = await Category.findOne({ 
+          name: { $regex: new RegExp(`^${data.name.trim()}$`, 'i') },
+          _id: { $ne: id }
+        });
+        
+        if (existingCategory) {
+          throw createDuplicateNameError(data.name.trim());
+        }
       }
+      
+      if (data.description !== undefined && data.description.length > 500) {
+        throw createValidationError('Description cannot exceed 500 characters');
+      }
+      
+      if (data.status !== undefined && !['active', 'inactive'].includes(data.status)) {
+        throw createValidationError('Status must be either "active" or "inactive"');
+      }
+      
+      // Build update object
+      const updateData = {};
+      if (data.name !== undefined) updateData.name = data.name.trim();
+      if (data.description !== undefined) updateData.description = data.description;
+      if (data.icon !== undefined) updateData.icon = data.icon;
+      if (data.status !== undefined) updateData.status = data.status;
+      
+      const category = await Category.findByIdAndUpdate(
+        id,
+        updateData,
+        { new: true, runValidators: true }
+      ).populate('documentCount');
+      
+      if (!category) {
+        throw createNotFoundError(id);
+      }
+      
+      return category;
+    } catch (error) {
+      const categoryError = handleMongooseError(error, operation);
+      logCategoryError(categoryError, operation, context);
+      throw categoryError;
     }
-
-    // Update fields
-    Object.keys(data).forEach(key => {
-      if (data[key] !== undefined) {
-        category[key] = data[key];
-      }
-    });
-
-    await category.save();
-    
-    return category;
   }
 
   /**
    * Delete category
-   * Requirements: 2.5, 2.6, 2.7, 12.2
+   * Requirements: 5.6, 15.2, 15.3
    */
   async deleteCategory(id) {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new Error('Invalid category ID');
-    }
-
-    const category = await Category.findById(id);
+    const operation = 'deleteCategory';
+    const context = { categoryId: id };
     
-    if (!category) {
-      throw new Error('Category not found');
+    try {
+      validateCategoryId(id);
+      
+      const category = await Category.findById(id);
+      
+      if (!category) {
+        throw createNotFoundError(id);
+      }
+      
+      // Check if it's the default category
+      if (category.isDefault) {
+        throw createCannotDeleteDefaultError();
+      }
+      
+      // Check if category has assigned documents
+      const documentCount = await Document.countDocuments({ category: id });
+      
+      if (documentCount > 0) {
+        throw createCategoryInUseError(category.name, documentCount);
+      }
+      
+      await Category.findByIdAndDelete(id);
+      
+      return {
+        success: true,
+        message: `Category '${category.name}' deleted successfully`
+      };
+    } catch (error) {
+      const categoryError = handleMongooseError(error, operation);
+      logCategoryError(categoryError, operation, context);
+      throw categoryError;
     }
-
-    // Prevent deletion of default category
-    if (category.isDefault) {
-      throw new Error('Cannot delete the default category');
-    }
-
-    // Check if category has documents
-    const documentCount = await Document.countDocuments({ category: id });
-    
-    if (documentCount > 0) {
-      throw new Error(`Cannot delete category because it has ${documentCount} assigned documents`);
-    }
-
-    await Category.findByIdAndDelete(id);
-    
-    return { success: true, message: 'Category deleted successfully' };
   }
 
   /**
    * Get documents by category with pagination
-   * Requirements: 4.4
+   * Requirements: 5.7, 4.4
    */
   async getDocumentsByCategory(categoryId, options = {}) {
-    if (!mongoose.Types.ObjectId.isValid(categoryId)) {
-      throw new Error('Invalid category ID');
-    }
-
-    // Verify category exists
-    const category = await Category.findById(categoryId);
-    if (!category) {
-      throw new Error('Category not found');
-    }
-
-    const page = parseInt(options.page) || 1;
-    const limit = parseInt(options.limit) || 20;
-    const skip = (page - 1) * limit;
-
-    const query = { category: categoryId };
+    const operation = 'getDocumentsByCategory';
+    const context = { categoryId, options };
     
-    // Apply status filter if provided
-    if (options.status) {
-      query.status = options.status;
-    }
-
-    const [documents, totalDocuments] = await Promise.all([
-      Document.find(query)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .populate('category', 'name slug icon'),
-      Document.countDocuments(query)
-    ]);
-
-    const totalPages = Math.ceil(totalDocuments / limit);
-
-    return {
-      category: {
-        _id: category._id,
-        name: category.name,
-        slug: category.slug,
-        icon: category.icon
-      },
-      documents,
-      pagination: {
-        currentPage: page,
-        totalPages,
-        totalDocuments,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
+    try {
+      validateCategoryId(categoryId);
+      
+      const category = await Category.findById(categoryId);
+      
+      if (!category) {
+        throw createNotFoundError(categoryId);
       }
-    };
+      
+      const page = Math.max(1, parseInt(options.page) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(options.limit) || 20));
+      const skip = (page - 1) * limit;
+      
+      const query = { category: categoryId };
+      
+      if (options.status) {
+        if (!['active', 'deactive'].includes(options.status)) {
+          throw createValidationError('Document status must be either "active" or "deactive"');
+        }
+        query.status = options.status;
+      }
+      
+      const [documents, totalDocuments] = await Promise.all([
+        Document.find(query)
+          .populate('category')
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit),
+        Document.countDocuments(query)
+      ]);
+      
+      const totalPages = Math.ceil(totalDocuments / limit);
+      
+      return {
+        category: {
+          _id: category._id,
+          name: category.name,
+          slug: category.slug,
+          icon: category.icon
+        },
+        documents,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalDocuments,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1
+        }
+      };
+    } catch (error) {
+      const categoryError = handleMongooseError(error, operation);
+      logCategoryError(categoryError, operation, context);
+      throw categoryError;
+    }
   }
 
   /**
    * Reorder categories
-   * Requirements: 11.1, 11.2, 11.3, 11.4, 11.5
+   * Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 15.4
    */
   async reorderCategories(orderArray) {
-    if (!Array.isArray(orderArray) || orderArray.length === 0) {
-      throw new Error('Order array is required and must not be empty');
-    }
-
-    // Validate all category IDs
-    const categoryIds = orderArray.map(item => item.categoryId || item);
-    const invalidIds = categoryIds.filter(id => !mongoose.Types.ObjectId.isValid(id));
+    const operation = 'reorderCategories';
+    const context = { orderArray };
     
-    if (invalidIds.length > 0) {
-      throw new Error('Invalid category IDs in order array');
-    }
-
-    // Verify all categories exist
-    const categories = await Category.find({ _id: { $in: categoryIds } });
-    
-    if (categories.length !== categoryIds.length) {
-      throw new Error('Some categories in order array do not exist');
-    }
-
-    // Update display order for each category
-    const updatePromises = orderArray.map((item, index) => {
-      const categoryId = item.categoryId || item;
-      return Category.findByIdAndUpdate(
-        categoryId,
-        { displayOrder: index + 1 },
-        { new: true }
+    try {
+      if (!Array.isArray(orderArray) || orderArray.length === 0) {
+        throw createValidationError('Order array is required and must not be empty');
+      }
+      
+      // Validate all category IDs
+      for (const categoryId of orderArray) {
+        validateCategoryId(categoryId);
+      }
+      
+      // Check if all categories exist
+      const categories = await Category.find({ _id: { $in: orderArray } });
+      
+      if (categories.length !== orderArray.length) {
+        const foundIds = categories.map(cat => cat._id.toString());
+        const missingIds = orderArray.filter(id => !foundIds.includes(id));
+        throw createValidationError(`Invalid category IDs: ${missingIds.join(', ')}`);
+      }
+      
+      // Update display order for each category
+      const updatePromises = orderArray.map((categoryId, index) => 
+        Category.findByIdAndUpdate(
+          categoryId,
+          { displayOrder: index + 1 },
+          { new: true }
+        )
       );
-    });
-
-    await Promise.all(updatePromises);
-
-    // Return updated categories sorted by new order
-    const updatedCategories = await Category.find({ _id: { $in: categoryIds } })
-      .sort({ displayOrder: 1 });
-
-    return updatedCategories;
+      
+      const updatedCategories = await Promise.all(updatePromises);
+      
+      // Return categories sorted by new order
+      return updatedCategories.sort((a, b) => a.displayOrder - b.displayOrder);
+    } catch (error) {
+      const categoryError = handleMongooseError(error, operation);
+      logCategoryError(categoryError, operation, context);
+      throw categoryError;
+    }
   }
 
   /**
@@ -268,56 +394,54 @@ class CategoryService {
    * Requirements: 7.1, 7.2, 7.3, 7.4, 7.5
    */
   async getCategoryStatistics() {
-    const [
-      totalCategories,
-      activeCategories,
-      documentsByCategory
-    ] = await Promise.all([
-      Category.countDocuments(),
-      Category.countDocuments({ status: 'active' }),
-      Document.aggregate([
-        {
-          $group: {
-            _id: '$category',
-            documentCount: { $sum: 1 },
-            imageCount: { $sum: { $size: '$images' } }
+    const operation = 'getCategoryStatistics';
+    const context = {};
+    
+    try {
+      const [
+        totalCategories,
+        activeCategories,
+        categoryStats
+      ] = await Promise.all([
+        Category.countDocuments(),
+        Category.countDocuments({ status: 'active' }),
+        Category.aggregate([
+          {
+            $lookup: {
+              from: 'documents',
+              localField: '_id',
+              foreignField: 'category',
+              as: 'documents'
+            }
+          },
+          {
+            $project: {
+              name: 1,
+              icon: 1,
+              status: 1,
+              documentCount: { $size: '$documents' }
+            }
+          },
+          {
+            $sort: { documentCount: -1 }
+          },
+          {
+            $limit: 10
           }
-        },
-        {
-          $lookup: {
-            from: 'categories',
-            localField: '_id',
-            foreignField: '_id',
-            as: 'category'
-          }
-        },
-        {
-          $unwind: '$category'
-        },
-        {
-          $project: {
-            categoryId: '$_id',
-            categoryName: '$category.name',
-            categorySlug: '$category.slug',
-            categoryIcon: '$category.icon',
-            documentCount: 1,
-            imageCount: 1
-          }
-        },
-        {
-          $sort: { documentCount: -1 }
-        }
-      ])
-    ]);
-
-    return {
-      totalCategories,
-      activeCategories,
-      inactiveCategories: totalCategories - activeCategories,
-      categoriesWithDocuments: documentsByCategory.length,
-      mostPopularCategories: documentsByCategory.slice(0, 5),
-      documentsByCategory
-    };
+        ])
+      ]);
+      
+      return {
+        totalCategories,
+        activeCategories,
+        inactiveCategories: totalCategories - activeCategories,
+        mostPopularCategories: categoryStats
+      };
+    } catch (error) {
+      const categoryError = handleMongooseError(error, operation);
+      logCategoryError(categoryError, operation, context);
+      throw categoryError;
+    }
   }
 
   /**
@@ -325,39 +449,49 @@ class CategoryService {
    * Requirements: 12.1, 12.2, 12.3, 12.4, 12.5
    */
   async initializeDefaultCategory() {
+    const operation = 'initializeDefaultCategory';
+    const context = {};
+    
     try {
       // Check if default category already exists
-      let defaultCategory = await Category.findOne({ isDefault: true });
+      const existingDefault = await Category.findOne({ isDefault: true });
       
-      if (defaultCategory) {
+      if (existingDefault) {
         return {
           success: true,
           message: 'Default category already exists',
-          category: defaultCategory,
-          created: false
+          category: existingDefault
         };
       }
-
+      
       // Create default "Uncategorized" category
-      defaultCategory = new Category({
+      const defaultCategory = new Category({
         name: 'Uncategorized',
+        slug: 'uncategorized',
         description: 'Documents without a specific category',
         icon: '📁',
         status: 'active',
         displayOrder: 999,
         isDefault: true
       });
-
+      
       await defaultCategory.save();
-
+      
+      logCategoryError(new Error('Default category initialized successfully'), operation, { 
+        ...context, 
+        categoryId: defaultCategory._id,
+        success: true 
+      });
+      
       return {
         success: true,
         message: 'Default category created successfully',
-        category: defaultCategory,
-        created: true
+        category: defaultCategory
       };
     } catch (error) {
-      throw new Error(`Failed to initialize default category: ${error.message}`);
+      const categoryError = handleMongooseError(error, operation);
+      logCategoryError(categoryError, operation, context);
+      throw categoryError;
     }
   }
 }
