@@ -2,108 +2,96 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Orbytrix 4D Explorer</title>
+<title>Orbytrix App UI</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 body {
   margin: 0;
   font-family: 'Segoe UI', sans-serif;
-  background: radial-gradient(circle at top, #0f172a, #020617);
+  background: #020617;
   color: white;
 }
 
 /* HEADER */
-h1 {
-  text-align: center;
-  padding: 20px;
-  font-size: 2.5rem;
-  background: linear-gradient(90deg, #38bdf8, #a78bfa);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.header {
+  position: sticky;
+  top: 0;
+  background: #020617;
+  padding: 15px;
+  z-index: 10;
+  border-bottom: 1px solid #1e293b;
 }
 
-.container {
-  padding: 20px;
-}
-
-/* CATEGORY */
-.category {
-  margin-bottom: 30px;
-  border-radius: 20px;
-  padding: 20px;
-  background: rgba(255,255,255,0.05);
-  backdrop-filter: blur(15px);
-  box-shadow: 0 0 30px rgba(56,189,248,0.1);
-  transition: 0.3s;
-}
-
-.category:hover {
-  transform: scale(1.01);
-  box-shadow: 0 0 50px rgba(167,139,250,0.3);
-}
-
-.category-header {
-  display: flex;
-  justify-content: space-between;
-  cursor: pointer;
-}
-
-.category-title {
-  font-size: 1.5rem;
+.title {
+  font-size: 1.8rem;
   font-weight: bold;
 }
 
-.count {
-  background: #38bdf8;
-  padding: 5px 10px;
+/* SEARCH */
+.search {
+  margin-top: 10px;
+  width: 100%;
+  padding: 10px;
   border-radius: 10px;
-  font-size: 0.8rem;
+  border: none;
+  outline: none;
+  background: #0f172a;
+  color: white;
+}
+
+/* CATEGORY */
+.container {
+  padding: 15px;
+}
+
+.category {
+  margin-bottom: 30px;
+}
+
+.category-title {
+  font-size: 1.3rem;
+  margin-bottom: 10px;
 }
 
 /* GRID */
 .grid {
-  margin-top: 15px;
-  display: none;
+  display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 15px;
 }
 
-.grid.active {
-  display: grid;
-}
-
 /* CARD */
 .card {
-  border-radius: 15px;
-  overflow: hidden;
-  position: relative;
-  transition: 0.4s;
-  cursor: pointer;
   background: #0f172a;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: 0.3s;
+  position: relative;
 }
 
 .card:hover {
-  transform: scale(1.08);
+  transform: scale(1.05);
 }
 
-/* 🔥 FIXED IMAGE */
 .card img {
   width: 100%;
-  height: 140px;
-  object-fit: contain; /* FIX */
-  background: #0f172a;
+  height: auto;
 }
 
-/* TITLE */
 .card-title {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
   padding: 5px;
-  font-size: 0.75rem;
-  background: rgba(0,0,0,0.7);
+  font-size: 0.8rem;
   text-align: center;
+}
+
+/* FAVORITE */
+.fav {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  cursor: pointer;
 }
 
 /* VIEWER */
@@ -113,11 +101,11 @@ h1 {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.95);
+  background: black;
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 999;
+  z-index: 100;
 }
 
 .viewer.hidden {
@@ -125,128 +113,120 @@ h1 {
 }
 
 .viewer img {
-  max-width: 90%;
-  max-height: 90%;
-  border-radius: 10px;
+  max-width: 100%;
+  max-height: 100%;
+  transition: transform 0.3s;
 }
 
-/* CLOSE BUTTON */
 .close {
   position: absolute;
   top: 20px;
-  right: 30px;
-  font-size: 30px;
+  right: 20px;
+  font-size: 25px;
   cursor: pointer;
 }
 
-/* NAVIGATION */
-.nav {
-  position: absolute;
-  top: 50%;
-  font-size: 50px;
-  cursor: pointer;
-  padding: 10px;
-  user-select: none;
-}
-
-.prev { left: 20px; }
-.next { right: 20px; }
-
-/* LOADER */
-.loader {
-  text-align: center;
-  margin-top: 50px;
-  font-size: 1.2rem;
-  color: #94a3b8;
-}
 </style>
 </head>
 
 <body>
 
-<h1>🚀 Orbytrix 4D Explorer</h1>
-
-<div class="container" id="app">
-  <div class="loader">Loading...</div>
+<div class="header">
+  <div class="title">🚀 Orbytrix</div>
+  <input class="search" placeholder="Search..." oninput="searchData(this.value)">
 </div>
 
-<!-- FULLSCREEN VIEWER -->
+<div class="container" id="app"></div>
+
 <div id="viewer" class="viewer hidden">
   <span class="close" onclick="closeViewer()">✕</span>
-  <img id="viewer-img" />
-  <div class="nav prev" onclick="prevImage()">‹</div>
-  <div class="nav next" onclick="nextImage()">›</div>
+  <img id="viewer-img">
 </div>
 
 <script>
 const URL = "https://cdn.jsdelivr.net/gh/orbytrixEnterprise/json/full-data.json";
 
 let fullData = [];
+let filteredData = [];
 let currentImages = [];
 let currentIndex = 0;
 
+/* LOAD DATA */
 async function loadData() {
-  try {
-    const res = await fetch(URL);
-    const json = await res.json();
+  const res = await fetch(URL);
+  const json = await res.json();
 
-    fullData = json.data;
+  fullData = json.data;
+  filteredData = fullData;
 
-    const app = document.getElementById("app");
-    app.innerHTML = "";
+  render();
+}
 
-    fullData.forEach(category => {
+/* RENDER */
+function render() {
+  const app = document.getElementById("app");
+  app.innerHTML = "";
 
-      const catDiv = document.createElement("div");
-      catDiv.className = "category";
+  filteredData.forEach(cat => {
+    const div = document.createElement("div");
+    div.className = "category";
 
-      const gridId = "grid-" + category.slug;
-
-      catDiv.innerHTML = `
-        <div class="category-header" onclick="toggle('${gridId}')">
-          <div class="category-title">
-            ${category.icon || "📁"} ${category.name}
+    div.innerHTML = `
+      <div class="category-title">${cat.icon || "📁"} ${cat.name}</div>
+      <div class="grid">
+        ${cat.documents.map((doc, i) => `
+          <div class="card" onclick="openViewer(${i}, '${cat.slug}')">
+            <img loading="lazy" src="${doc.image}">
+            <div class="fav" onclick="toggleFav(event, '${doc.id}')">❤️</div>
+            <div class="card-title">${doc.title}</div>
           </div>
-          <div class="count">${category.total_items}</div>
-        </div>
+        `).join("")}
+      </div>
+    `;
 
-        <div class="grid" id="${gridId}">
-          ${category.documents.map((doc, index) => `
-            <div class="card" onclick="openViewer(${index}, '${category.slug}')">
-              <img src="${doc.image}" />
-              <div class="card-title">${doc.title}</div>
-            </div>
-          `).join("")}
-        </div>
-      `;
-
-      app.appendChild(catDiv);
-    });
-
-  } catch (err) {
-    document.getElementById("app").innerHTML = "❌ Failed to load data";
-    console.error(err);
-  }
+    app.appendChild(div);
+  });
 }
 
-function toggle(id) {
-  document.getElementById(id).classList.toggle("active");
+/* SEARCH */
+function searchData(value) {
+  value = value.toLowerCase();
+
+  filteredData = fullData.map(cat => {
+    const docs = cat.documents.filter(d => d.title.toLowerCase().includes(value));
+    return { ...cat, documents: docs };
+  });
+
+  render();
 }
 
-/* VIEWER FUNCTIONS */
-
+/* VIEWER */
 function openViewer(index, slug) {
-  const category = fullData.find(c => c.slug === slug);
-  currentImages = category.documents.map(d => d.image);
+  const cat = fullData.find(c => c.slug === slug);
+  currentImages = cat.documents.map(d => d.image);
   currentIndex = index;
 
   document.getElementById("viewer").classList.remove("hidden");
-  document.getElementById("viewer-img").src = currentImages[currentIndex];
+  document.getElementById("viewer-img").src = currentImages[index];
 }
 
 function closeViewer() {
   document.getElementById("viewer").classList.add("hidden");
 }
+
+/* SWIPE SUPPORT */
+let startX = 0;
+
+document.getElementById("viewer").addEventListener("touchstart", e => {
+  startX = e.touches[0].clientX;
+});
+
+document.getElementById("viewer").addEventListener("touchend", e => {
+  let endX = e.changedTouches[0].clientX;
+
+  if (startX - endX > 50) nextImage();
+  if (endX - startX > 50) prevImage();
+});
 
 function nextImage() {
   currentIndex = (currentIndex + 1) % currentImages.length;
@@ -256,6 +236,20 @@ function nextImage() {
 function prevImage() {
   currentIndex = (currentIndex - 1 + currentImages.length) % currentImages.length;
   document.getElementById("viewer-img").src = currentImages[currentIndex];
+}
+
+/* FAVORITES */
+function toggleFav(e, id) {
+  e.stopPropagation();
+  let favs = JSON.parse(localStorage.getItem("favs") || "[]");
+
+  if (favs.includes(id)) {
+    favs = favs.filter(f => f !== id);
+  } else {
+    favs.push(id);
+  }
+
+  localStorage.setItem("favs", JSON.stringify(favs));
 }
 
 loadData();
