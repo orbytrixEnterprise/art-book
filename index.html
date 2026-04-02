@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Orbytrix 4D Explorer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: radial-gradient(circle at top, #0f172a, #020617);
+      color: white;
+    }
+
+    h1 {
+      text-align: center;
+      padding: 20px;
+      font-size: 2.5rem;
+      background: linear-gradient(90deg, #38bdf8, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .container {
+      padding: 20px;
+    }
+
+    .category {
+      margin-bottom: 30px;
+      border-radius: 20px;
+      padding: 20px;
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(15px);
+      box-shadow: 0 0 30px rgba(56,189,248,0.1);
+      transition: 0.3s;
+    }
+
+    .category:hover {
+      transform: scale(1.01);
+      box-shadow: 0 0 50px rgba(167,139,250,0.3);
+    }
+
+    .category-header {
+      display: flex;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+
+    .category-title {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+
+    .count {
+      background: #38bdf8;
+      padding: 5px 10px;
+      border-radius: 10px;
+      font-size: 0.8rem;
+    }
+
+    .grid {
+      margin-top: 15px;
+      display: none;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 15px;
+    }
+
+    .grid.active {
+      display: grid;
+    }
+
+    .card {
+      border-radius: 15px;
+      overflow: hidden;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: 0.4s;
+      cursor: pointer;
+    }
+
+    .card:hover {
+      transform: rotateY(12deg) rotateX(12deg) scale(1.08);
+    }
+
+    .card img {
+      width: 100%;
+      height: 140px;
+      object-fit: cover;
+    }
+
+    .card-title {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      padding: 5px;
+      font-size: 0.75rem;
+      background: rgba(0,0,0,0.7);
+      text-align: center;
+    }
+
+    .loader {
+      text-align: center;
+      margin-top: 50px;
+      font-size: 1.2rem;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>🚀 Orbytrix 4D Explorer</h1>
+
+<div class="container" id="app">
+  <div class="loader">Loading...</div>
+</div>
+
+<script>
+const URL = "https://cdn.jsdelivr.net/gh/orbytrixEnterprise/json/full-data.json";
+
+async function loadData() {
+  try {
+    const res = await fetch(URL);
+    const json = await res.json();
+
+    const app = document.getElementById("app");
+    app.innerHTML = "";
+
+    json.data.forEach(category => {
+
+      const catDiv = document.createElement("div");
+      catDiv.className = "category";
+
+      const gridId = "grid-" + category.slug;
+
+      catDiv.innerHTML = `
+        <div class="category-header" onclick="toggle('${gridId}')">
+          <div class="category-title">
+            ${category.icon || "📁"} ${category.name}
+          </div>
+          <div class="count">${category.total_items}</div>
+        </div>
+
+        <div class="grid" id="${gridId}">
+          ${category.documents.map(doc => `
+            <div class="card">
+              <img src="${doc.image}" />
+              <div class="card-title">${doc.title}</div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+
+      app.appendChild(catDiv);
+    });
+
+  } catch (err) {
+    document.getElementById("app").innerHTML = "❌ Failed to load data";
+    console.error(err);
+  }
+}
+
+function toggle(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle("active");
+}
+
+loadData();
+</script>
+
+</body>
+</html>
