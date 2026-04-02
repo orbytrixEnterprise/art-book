@@ -44,6 +44,10 @@ const options = {
       {
         name: 'Dashboard',
         description: 'Dashboard statistics and overview endpoints'
+      },
+      {
+        name: 'JSON Publisher',
+        description: 'Generate and publish static JSON files to GitHub'
       }
     ]
   },
